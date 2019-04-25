@@ -3,6 +3,7 @@
 
 import MySQLdb
 import time
+import operator
 
 #在windows下使用localhost会出现10061错误
 DB_IP = '127.0.0.1'
@@ -24,14 +25,12 @@ def createdb(name):
     db.autocommit(False)
     cursor.execute('set names utf8')
     db.commit()
-
-    name = '%s' % name
     try:
         cursor.execute('show databases')
         rows = cursor.fetchall()
         for row in rows:
             row_name = '%s' % row
-            ret = cmp(name, row_name)
+            ret = operator.eq(name, row_name)
             if ret == 0:
                 #print "DataBase Already Exits"
                 return True
@@ -40,7 +39,7 @@ def createdb(name):
         db.commit()
         return True
     except Exception as e:
-        print e.args
+        print(e.args)
         db.rollback()
         return False
     finally:
@@ -64,7 +63,7 @@ def createtable(strdate):
         rows = cursor.fetchall()
         for row in rows:
             row_name = '%s' % row
-            result = cmp(name, row_name)
+            result = operator.eq(name, row_name)
             if result == 0:
                 #print "DataBase Already Exits"
                 return name
@@ -88,10 +87,10 @@ def createtable(strdate):
 #       cursor.execute(sql)
 #       db.commit()
         ret = name
-        print 'create tb success'
+        print('create tb success')
         return ret
     except Exception as e:
-        print "create_table Except : %s" % e.args
+        print("create_table Except : %s" % e.args)
         db.rollback()
     finally:
         cursor.close()
@@ -125,7 +124,7 @@ def getGroupIDLast(tbname):
         if result:
             gGroupID = result[0]
     except Exception as e:
-        print e.args
+        print(e.args)
     finally:
         cursor.close()
         db.close()
@@ -134,7 +133,7 @@ def getGroupIDLast(tbname):
 def sellOneItem(tbname, name, count, money):
     db = connectdb(DB_NAME)
     cursor = db.cursor()
-    print 'table name:%s'%tbname
+    print('table name:%s'%tbname)
     try:
         datetime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
         sql = 'insert into %s' % tbname + \
@@ -144,7 +143,7 @@ def sellOneItem(tbname, name, count, money):
         cursor.execute(sql)
         db.commit()
     except Exception as e:
-        print e.args
+        print(e.args)
         db.rollback()
     finally:
         cursor.close()
@@ -167,7 +166,7 @@ def sellSomeItem(tbname, name_count_list, money):
             cursor.execute(sql)
             db.commit()
     except Exception as e:
-        print e.args
+        print(e.args)
         db.rollback()
     finally:
         cursor.close()
@@ -190,7 +189,7 @@ def putInStorage(tbname, str_list):
         cursor.execute(sql)
         db.commit()
     except Exception as e:
-        print e.args
+        print(e.args)
         db.rollback()
     finally:
         cursor.close()
@@ -210,18 +209,22 @@ def getItem(tbname):
             else:
                 break
     except Exception as e:
-        print e.args
+        print(e.args)
     finally:
         return ret_list
         cursor.close()
         db.close()
 
 if __name__ == '__main__':
+    print('create db')
     ret = createdb(DB_NAME)
+    print(ret)
     if ret == True:
         #print 'create tb'
-        datestr = time.strftime('%Y%m%d', time.localtime(time.time()))  
+        datestr = time.strftime('%Y%m%d', time.localtime(time.time()))
+        #print(datestr)
         gTableName = createtable(datestr)
+        #print(gTableName)
         #print gTableName
         #sellOneItem(gTableName, "jiezhi", 20, 1500.5)
         #getGroupIDLast(gTableName)

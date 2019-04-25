@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 
-#from tkinter import *
+# from tkinter import *
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkm
@@ -12,16 +12,17 @@ import xpinyin
 
 import pMySQL2 as mysql
 
-#登陆功能 https://www.cnblogs.com/wwf828/p/7418181.html#autoid-15-0-0
 
+# 登陆功能 https://www.cnblogs.com/wwf828/p/7418181.html#autoid-15-0-0
+# py3.7 MySQLdb https://www.cnblogs.com/SH170706/p/10082987.html, https://pypi.org/project/mysqlclient/#files
 class FindLocation(object):
     def __init__(self):
-        #创建主窗口,用于容纳其它组件
+        # 创建主窗口,用于容纳其它组件
         self.root = tk.Tk()
         # 给主窗口设置标题内容
         self.root.update()
-        self.RootWidth = self.root.winfo_screenwidth() * 3/4
-        self.RootHeight = self.root.winfo_screenheight() *3/4
+        self.RootWidth = self.root.winfo_screenwidth() * 3 / 4
+        self.RootHeight = self.root.winfo_screenheight() * 3 / 4
         self.Root_xoffset = self.root.winfo_x()
         self.Root_yoffset = self.root.winfo_y()
 
@@ -31,22 +32,26 @@ class FindLocation(object):
         self.root.resizable(width=False, height=False)
 
         self.child_screen_exits = False
-        self.sell_flag = False  #用来判断是单条记录还是多条记录的标志位
-        #查询是否有今日的表，如果没有就创建今日表
-        datestr = time.strftime('%Y%m%d', time.localtime(time.time()))  
+        self.messagebox_exits = False
+        self.sell_flag = False  # 用来判断是单条记录还是多条记录的标志位
+        self.toplevel_id = 0
+        # 查询是否有今日的表，如果没有就创建今日表
+        datestr = time.strftime('%Y%m%d', time.localtime(time.time()))
         mysql.createdb('myshop')
         self.TableName = mysql.createtable(datestr)
 
         self.goodsNameList = []
 
-        #参考自https://cloud.tencent.com/developer/ask/130543
-        #参考自https://www.cnblogs.com/qwangxiao/p/9940972.html
-        clos = ('DeviceID', 'Name', 'SName', 'InTime', 'OutTime', 'TotalNum', 'ShopNum', 'InPrice', 'OutPrice', 'GroupSellID', 'GroupMoney')
-        self.display_info = ttk.Treeview(self.root, columns = clos, show='headings')
+        # 参考自https://cloud.tencent.com/developer/ask/130543
+        # 参考自https://www.cnblogs.com/qwangxiao/p/9940972.html
+        clos = (
+        'DeviceID', 'Name', 'SName', 'InTime', 'OutTime', 'TotalNum', 'ShopNum', 'InPrice', 'OutPrice', 'GroupSellID',
+        'GroupMoney')
+        self.display_info = ttk.Treeview(self.root, columns=clos, show='headings')
         for col in clos:
             self.display_info.heading(col, text=col)
-        self.display_info.grid(row=1, column = 0, columnspan = 2)
-        #设置列的宽度和对齐方式
+        self.display_info.grid(row=1, column=0, columnspan=2)
+        # 设置列的宽度和对齐方式
         self.display_info.column('0', width=60, anchor='center')
         self.display_info.column('1', width=90, anchor='n')
         self.display_info.column('2', width=90, anchor='ne')
@@ -59,58 +64,92 @@ class FindLocation(object):
         self.display_info.column('9', width=70, anchor='ne')
         self.display_info.column('10', width=70, anchor='ne')
         # 创建一个查询结果的按钮
-        self.sell_button = tk.Button(self.root, command = self.FuncSell, text = "售出", bd=10, bg='white', font=("黑体", 36))
-        self.input_button = tk.Button(self.root, command = self.FuncInput, text = "入库", bd=10, bg='white', font=("黑体", 36))
-        self.tongji_day_button = tk.Button(self.root, command = self.FuncTJDay, text = "当日", bd=10, bg='white', font=("黑体", 36))
-        self.tongji_month_button = tk.Button(self.root, command = self.FuncTJMonth, text = "当月", bd=10, bg='white', font=("黑体", 36))
-        #创建刷新显示的线程
+        self.sell_button = tk.Button(self.root, command=self.FuncSell, text="售出", bd=10, bg='white', font=("黑体", 36))
+        self.input_button = tk.Button(self.root, command=self.FuncInput, text="入库", bd=10, bg='white', font=("黑体", 36))
+        self.tongji_day_button = tk.Button(self.root, command=self.FuncTJDay, text="当日", bd=10, bg='white',
+                                           font=("黑体", 36))
+        self.tongji_month_button = tk.Button(self.root, command=self.FuncTJMonth, text="当月", bd=10, bg='white',
+                                             font=("黑体", 36))
+        # 创建刷新显示的线程
         t1 = threading.Thread(target=self.ThreadUpdateDisplay, args=())
         t1.setDaemon(True)
         t1.start()
 
     def ThreadUpdateDisplay(self):
         display_len = 0
-        
+
         while True:
             display_list_info = []
             ret_list = mysql.getItem(self.TableName)
             if ret_list:
                 if len(ret_list) != display_len:
                     display_len = len(ret_list)
-                    ret_list.sort(key=lambda e:e[1], reverse=True)
+                    ret_list.sort(key=lambda e: e[1], reverse=True)
                     alreadyExitsItem = self.display_info.get_children()
 
-                    for new_item in ret_list:   #从数据库的数据中提取出一条信息
+                    for new_item in ret_list:  # 从数据库的数据中提取出一条信息
                         isInDisplay = False
-                        new_item_name = '%s' % new_item[1]  #获取名字信息
-                        for item in alreadyExitsItem:   #从显示列表中提取一条信息
-                            item_text = self.display_info.item(item,"values")
-                            #print(item_text[1])#输出所选行的第一列的值
-                            item_name = '%s' % item_text[1] #获取显示的名字信息
+                        new_item_name = '%s' % new_item[1]  # 获取名字信息
+                        for item in alreadyExitsItem:  # 从显示列表中提取一条信息
+                            item_text = self.display_info.item(item, "values")
+                            # print(item_text[1])#输出所选行的第一列的值
+                            item_name = '%s' % item_text[1]  # 获取显示的名字信息
                             result = cmp(item_name, new_item_name)
                             if result == 0:
                                 isInDisplay = True
                                 break
                         if isInDisplay == False:
                             display_list_info.append(new_item)
-                            #将获取到的商品名加入到goodsNameList中，不能重复加入，并将名称转换为拼音
+                            # 将获取到的商品名加入到goodsNameList中，不能重复加入，并将名称转换为拼音
                             unicode_name = u'%s' % new_item_name
-                            #print unicode_name
+                            # print unicode_name
                             name_pinyin = xpinyin.Pinyin().get_pinyin(unicode_name)
-                            #print 'pinyin =%s' % ret
+                            # print 'pinyin =%s' % ret
                             self.goodsNameList.append([new_item_name, name_pinyin])
-                            #print self.goodsNameList
+                            # print self.goodsNameList
 
-            #print display_list_info
+            # print display_list_info
             if display_list_info:
                 for item in display_list_info:
                     self.display_info.insert("", "end", values=item)
 
             time.sleep(1)
 
+    # def ShowMessageBoxClose(self, topid):
+    #    topid.destroy()
+    #    self.messagebox_exits = False
+
+    def ShowMessageBox(self, msg):
+
+        if self.messagebox_exits == True:
+            return
+
+        self.messagebox_exits = True
+
+        self.root.update()
+        sell_win_width = 200
+        sell_win_height = 80
+        self.Root_xoffset = self.root.winfo_x()
+        self.Root_yoffset = self.root.winfo_y()
+        child_width = ((self.RootWidth - sell_win_width) / 2) + self.Root_xoffset
+        child_height = ((self.RootHeight - sell_win_height) / 2) + self.Root_yoffset
+        size_str = '%dx%d+%d+%d' % (sell_win_width, sell_win_height, child_width, child_height)
+
+        thisTop = tk.Toplevel(self.toplevel_id)
+        thisTop.resizable(False, False)
+        thisTop.geometry(size_str)
+        thisTop.wm_attributes('-topmost', True)
+        # 设置右上角的X功能
+        thisTop.protocol("WM_DELETE_WINDOW", lambda arg=thisTop: self.FuncButtonCancel(arg))
+        # 设置窗口始终在最上层
+        # self.selltop.wm_attributes("-topmost", 1)
+        thisTop.title('Warning')
+        tk.Label(thisTop, text=msg, fg='red', bg='blue', font=('黑体', 18)).pack()
+        tk.Button(thisTop, text='确认', font=('黑体', 14), command=lambda: self.FuncButtonCancel(thisTop)).pack()
+
     def SellCheckFunc(self):
-        #strvar_price = tk.StringVar()
-        print 'checkbutton'
+        # strvar_price = tk.StringVar()
+        # print 'checkbutton'
         if self.sell_price_flag == True:
             self.sell_price_checkbutton_name.set('单价')
             self.sell_price_flag = False
@@ -119,37 +158,49 @@ class FindLocation(object):
             self.sell_price_flag = True
 
     def test_input_is_digit(self, content):
-    # 如果不加上==""的话，就会发现删不完。总会剩下一个数字
+        # 如果不加上==""的话，就会发现删不完。总会剩下一个数字
         rule = r"^[0-9]+\.?[0-9]?$"
         ret = re.match(rule, content)
 
         if ret or content == "":
-        #if content.isdigit() or content == "":
+            # if content.isdigit() or content == "":
             return True
         else:
-            tkm.showwarning('警告','只能够输入数字')
-            #print content
+            # tkm.showwarning('警告','只能够输入数字')
+            self.ShowMessageBox('只能够输入数字')
+            # print content
             return False
 
     # flag = 1 表示单个商品卖出的分支
     # flag = 2 表示商品入库的分支
     # flag = 3 表示多个商品卖出的分支
     def FuncButtonYes(self, screenid, flag):
-        #print 'sellyes'
-        #将数据提取组成mysql格式字符串，调用mysql，写入到数据库中
+        # print 'sellyes'
+        # 将数据提取组成mysql格式字符串，调用mysql，写入到数据库中
         if self.child_screen_exits == False:
             return
 
         try:
             if flag == 1:
-                #售出货物界面按下确认键
-                print 'flag = 1'
+                # 售出货物界面按下确认键
+                # print 'flag = 1'
                 name = self.sell_name_entry.get()
                 number_str = self.sell_number_entry.get()
                 money_str = self.sell_monery_entry.get()
                 if not name or not number_str or not money_str:
-                    tkm.showinfo('警告','请输入有效数据')
+                    # tkm.showinfo('警告','请输入有效数据')
+                    self.ShowMessageBox('请输入有效数据')
                     return
+
+                for val in name:
+                    if val >= 'a' and val <= 'z':
+                        name = self.sell_name_listbox.get(0)
+                        # print name
+                    elif val >= 'A' and val <= 'Z':
+                        name = self.sell_name_listbox.get(0)
+                        # print name
+                    else:
+                        break
 
                 input_number = int(number_str, 10)
                 input_money = float(money_str)
@@ -157,14 +208,15 @@ class FindLocation(object):
                 money = 0
 
             elif flag == 2:
-                #货物入库界面按下确认键
-                print 'flag = 2'
+                # 货物入库界面按下确认键
+                # print 'flag = 2'
                 name = self.input_name_entry.get()
                 number_str = self.input_number_entry.get()
                 money_str = self.input_monery_entry.get()
-                
+
                 if not name or not number_str or not money_str:
-                    tkm.showinfo('警告','请输入有效数据')
+                    # tkm.showinfo('警告','请输入有效数据')
+                    self.ShowMessageBox('请输入有效数据')
                     return
 
                 input_number = int(number_str, 10)
@@ -172,10 +224,10 @@ class FindLocation(object):
 
                 money = 0
                 if self.sell_price_flag == True:
-                    #print '总价格'
+                    # print '总价格'
                     money = input_money
                 else:
-                    #print '单独价格'
+                    # print '单独价格'
                     money = input_number * input_money
 
                 mysql_string_list = []
@@ -183,85 +235,99 @@ class FindLocation(object):
                 mysql_string_list.append(name)
                 mysql_string_list.append(input_number)
                 mysql_string_list.append(money)
-                print mysql_string_list
+                print(mysql_string_list)
                 mysql.putInStorage(self.TableName, mysql_string_list)
             elif flag == 3:
-                print 'flag = 3'
                 num = self.sell_mull_result_listbox.size()
-                print 'have %d' % num
+                # print 'have %d' % num
                 if num < 2:
-                    tkm.showinfo('警告','请确认数据输入是否正确!')
+                    # tkm.showinfo('警告','请确认数据输入是否正确!')
+                    self.ShowMessageBox('数据有错误')
                     return
 
                 for val in self.sell_mull_result_listbox.get(0, last='end'):
                     if val.startswith('total'):
-                        print 'date right'
+                        print('date right')
                         return
 
-                tkm.showinfo('警告','请确认数据输入是否正确!')
+                # tkm.showinfo('警告','请确认数据输入是否正确!')
+                self.ShowMessageBox('数据有错误')
             else:
-                print 'other widget button'
-
-            #self.child_screen_exits = False
-            #screenid.destroy()
+                print('other widget button')
         except Exception as e:
-            print e.args
+            print(e.args)
 
     def FuncButtonCancel(self, screenid):
-        print 'button cancel'
-        if self.child_screen_exits == True:
-            screenid.destroy()
+        # print 'button cancel'
+        screenid.destroy()
+        if self.messagebox_exits == True:
+            self.messagebox_exits = False
+        elif self.child_screen_exits == True:
             self.child_screen_exits = False
+            self.toplevel_id = 0
+        else:
+            print('error FuncButtonCancel')
 
     def FuncButtonSellMullAdd(self, args):
         if self.child_screen_exits == False:
             return
 
-        if args == 1: # 添加条目信息
+        if args == 1:  # 添加条目信息
             name = self.sell_mull_name_entry.get()
             number_str = self.sell_mull_number_entry.get()
-            #print name
-            #print number_str
+            # print name
+            # print number_str
             if not name or not number_str:
-                tkm.showinfo('警告','111请输入有效数据')
+                # tkm.showinfo('警告','111请输入有效数据')
+                self.ShowMessageBox('请输入有效数据')
                 return
-            #判断name是不是字母，如果是字母则直接提取list里的第一条信息作为name值
+            # 判断name是不是字母，如果是字母则直接提取list里的第一条信息作为name值
             for val in name:
                 if val >= 'a' and val <= 'z':
                     name = self.sell_mull_name_listbox.get(0)
-                    #print name
+                    # print name
                 elif val >= 'A' and val <= 'Z':
                     name = self.sell_mull_name_listbox.get(0)
-                    #print name
+                    # print name
                 else:
                     break
 
-            #将数据加入到右侧list中显示
-            val = '%sx%s' %(name, number_str)
+            # 将数据加入到右侧list中显示
+            val = '%sx%s' % (name, number_str)
             self.sell_mull_result_listbox.insert('end', val)
-        elif args == 2: # 添加总金额信息
+        elif args == 2:  # 添加总金额信息
             money_str = self.sell_mull_money_entry.get()
             if not money_str:
-                tkm.showinfo('警告','2222请输入有效数据')
+                # tkm.showinfo('警告','2222请输入有效数据')
+                self.ShowMessageBox('请输入有效数据')
                 return
 
             for val in self.sell_mull_result_listbox.get(0, last='end'):
                 if val.startswith('total'):
-                    tkm.showinfo('警告','已存在总金额信息')
+                    # tkm.showinfo('警告','已存在总金额信息')
+                    self.ShowMessageBox('已存在总金额信息')
                     return
 
             val = 'total:%s' % money_str
             self.sell_mull_result_listbox.insert('end', val)
         else:
-            tkm.showinfo('警告','Error:PressButtonNoParamter')
+            # tkm.showinfo('警告','Error:PressButtonNoParamter')
+            self.ShowMessageBox('已存在总金额信息')
+
+    def SellMullResultListboxDoubleClickFunc(self, event):
+        # print 'SellMullResultListboxDoubleClickFunc'
+        select = self.sell_mull_result_listbox.curselection()
+        if select:
+            # print self.sell_mull_result_listbox.get(select)
+            self.sell_mull_result_listbox.delete(select)
 
     def FuncSellComboxSelectedHander(self, args):
-        #print self.sell_comboxlist.get()
-        #print args
+        # print self.sell_comboxlist.get()
+        # print args
         if self.sell_flag == False:
             select = self.sell_name_listbox.curselection()
             if not select:
-                return 
+                return
             name = self.sell_name_listbox.get(select)
             self.sell_name_entry_var.set(name)
         else:
@@ -272,30 +338,26 @@ class FindLocation(object):
             self.sell_mull_name_entry_var.set(name)
 
     def get_name_by_pinyin_func(self, content):
-        print 'get_name_by_pinyin_func:%s' % content
-        # 如果不加上==""的话，就会发现删不完。总会剩下一个数字
+        # print 'get_name_by_pinyin_func:%s' % content
         display_list = []
-
-        content = content.lower()   #转换为小写
-
-        #rule = r"^[aA-zZ]+$"
+        content = content.lower()  # 转换为小写
+        # rule = r"^[aA-zZ]+$"
         rule = r"^[a-z]+$"
         ret = re.match(rule, content)
 
         if ret or content == "":
-        #if content.isdigit() or content == "":
-            for name,name_pinyin in self.goodsNameList:
-                #print 'name:%s' % name
-                #print 'name_pinyin:%s' % name_pinyin
+            # if content.isdigit() or content == "":
+            for name, name_pinyin in self.goodsNameList:
+                # print 'name:%s' % name
+                # print 'name_pinyin:%s' % name_pinyin
                 name_pinyin_list = name_pinyin.split('-')
-                #print name_pinyin_list
-                #temp_len = len(name_pinyin_list)
+                # print name_pinyin_list
                 temp_len = len(content) - 1
                 ch_pos = 0
                 add_flag = False
-                #寻找名字符合拼音的对象项
+                # 寻找名字符合拼音的对象项
                 for ch in content:
-                    #print 'ch=%s' % ch
+                    # print 'ch=%s' % ch
                     if name_pinyin_list[ch_pos].startswith(ch):
                         if ch_pos == temp_len:
                             add_flag = True
@@ -309,13 +371,13 @@ class FindLocation(object):
                     if name not in display_list:
                         display_list.append(name)
 
-            #self.sell_comboxlist["values"] = display_list
-            #一次性添加所有值，但是会把list的[]也添加进去
-            #self.sell_name_listbox_var.set(display_list)
-            #删除listbox内全部元素
+            # self.sell_comboxlist["values"] = display_list
+            # 一次性添加所有值，但是会把list的[]也添加进去
+            # self.sell_name_listbox_var.set(display_list)
+            # 删除listbox内全部元素
             if self.sell_flag == False:
                 self.sell_name_listbox.delete(0, last='end')
-                #添加
+                # 添加
                 for val in display_list:
                     self.sell_name_listbox.insert('end', val)
             else:
@@ -324,26 +386,27 @@ class FindLocation(object):
                     self.sell_mull_name_listbox.insert('end', val)
             return True
         else:
-            #从list列表中查看当前文本框中的内容是不是list里的内容，如果是，说明是点击或手动输入的
+            # 从list列表中查看当前文本框中的内容是不是list里的内容，如果是，说明是点击或手动输入的
             if self.sell_flag == False:
                 for item_name in self.sell_name_listbox.get(0, last='end'):
-                    #以startswith方式判断，这样当文本框中的内容被删除一个或多个字时不回出现错误
+                    # 以startswith方式判断，这样当文本框中的内容被删除一个或多个字时不回出现错误
                     if item_name.startswith(content):
                         return True
             else:
                 for item_name in self.sell_mull_name_listbox.get(0, last='end'):
                     if item_name.startswith(content):
                         return True
-            
-            tkm.showinfo('警告','只能够输入拼音字母')
-            #print content
+
+            # tkm.showinfo('警告','只能够输入拼音字母')
+            self.ShowMessageBox('只能够输入拼音字母')
+            # print content
             return False
 
     def sellRadiobuttonFunc(self):
         who = self.sell_radiobutton_var.get()
-        #print who
+        # print who
         if who == '1':
-            #print '111'
+            # print '111'
             self.sell_flag = False
             self.sell_name_entry.__setitem__('state', 'normal')
             self.sell_number_entry.__setitem__('state', 'normal')
@@ -362,7 +425,7 @@ class FindLocation(object):
             self.sell_mull_YesButton.__setitem__('state', 'disabled')
             self.sell_mull_CancelButton.__setitem__('state', 'disabled')
         else:
-            #print '2222'
+            # print '2222'
             self.sell_flag = True
             self.sell_name_entry.__setitem__('state', 'disabled')
             self.sell_number_entry.__setitem__('state', 'disabled')
@@ -382,14 +445,14 @@ class FindLocation(object):
             self.sell_mull_CancelButton.__setitem__('state', 'normal')
 
     def FuncSell(self):
-        print 'sell FuncSell'
+        # print 'sell FuncSell'
         if self.child_screen_exits == True:
-            print 'sell screen exits'
+            # print 'sell screen exits'
             return
-        #该窗口分割成两个部分，左侧是单条卖货记录添加，右侧是组合卖货记录添加
+        # 该窗口分割成两个部分，左侧是单条卖货记录添加，右侧是组合卖货记录添加
         self.child_screen_exits = True
         ##左侧的单次卖出窗口
-        #设置弹出窗口在主窗体的中间
+        # 设置弹出窗口在主窗体的中间
         self.root.update()
         sell_win_width = 800
         sell_win_height = 280
@@ -402,97 +465,113 @@ class FindLocation(object):
         self.selltop = tk.Toplevel(self.root)
         self.selltop.geometry(size_str)
         self.selltop.resizable(width=False, height=False)
-        #设置右上角的X功能
-        self.selltop.protocol("WM_DELETE_WINDOW",lambda arg=self.selltop: self.FuncButtonCancel(arg))
-        #设置窗口始终在最上层
+        # 设置右上角的X功能
+        self.selltop.protocol("WM_DELETE_WINDOW", lambda arg=self.selltop: self.FuncButtonCancel(arg))
+        # 设置窗口始终在最上层
         self.selltop.wm_attributes("-topmost", 1)
         self.selltop.title('售出信息输入框')
-        #radiobutton
-        self.sell_flag = False  #用来判断是单条记录还是多条记录的标志位
+        self.toplevel_id = self.selltop
+        # radiobutton
+        self.sell_flag = False  # 用来判断是单条记录还是多条记录的标志位
         self.sell_radiobutton_var = tk.StringVar()
-        self.sell_radiobutton_var.set(1)    #设置默认值为value=1的选项，即‘单条记录’
-        tk.Radiobutton(self.selltop, text='单条记录', variable = self.sell_radiobutton_var, value=1, command=self.sellRadiobuttonFunc).grid(row=0, column=0, padx=10, pady=1, columnspan=3)
-        tk.Radiobutton(self.selltop, text='组合记录', variable = self.sell_radiobutton_var, value=2, command=self.sellRadiobuttonFunc).grid(row=0, column=4, padx=10, pady=1, columnspan=6)
-        #画布
+        self.sell_radiobutton_var.set(1)  # 设置默认值为value=1的选项，即‘单条记录’
+        tk.Radiobutton(self.selltop, text='单条记录', variable=self.sell_radiobutton_var, value=1,
+                       command=self.sellRadiobuttonFunc).grid(row=0, column=0, padx=10, pady=1, columnspan=3)
+        tk.Radiobutton(self.selltop, text='组合记录', variable=self.sell_radiobutton_var, value=2,
+                       command=self.sellRadiobuttonFunc).grid(row=0, column=4, padx=10, pady=1, columnspan=6)
+        # 画布
         canvas_width = 20
         canvas_height = sell_win_height - 5
-        canvas = tk.Canvas(self.selltop, width=canvas_width, height= canvas_height)
-        #canvas.place(x=10,y=10, width=100, height=200)
+        canvas = tk.Canvas(self.selltop, width=canvas_width, height=canvas_height)
+        # canvas.place(x=10,y=10, width=100, height=200)
         canvas.grid(row=0, column=3, padx=1, pady=1, rowspan=10)
-        canvas.create_line( canvas_width/2, 0, canvas_width/2, canvas_height)
-        #label
+        canvas.create_line(canvas_width / 2, 0, canvas_width / 2, canvas_height)
+        # label
         tk.Label(self.selltop, text='货物名称').grid(row=1, column=0, padx=1, pady=1)
         tk.Label(self.selltop, text='货物数量').grid(row=1, column=1, padx=1, pady=1)
         tk.Label(self.selltop, text='金 额').grid(row=1, column=2, padx=1, pady=1)
-        #输入框限制函数
+        # 输入框限制函数
         test_cmd = self.selltop.register(self.test_input_is_digit)
         get_name_by_pinyin = self.selltop.register(self.get_name_by_pinyin_func)
-        #货物名称输入框
+        # 货物名称输入框
         self.sell_name_entry_var = tk.StringVar()
-        self.sell_name_entry = tk.Entry(self.selltop, textvariable = self.sell_name_entry_var, validate='key', validatecommand=(get_name_by_pinyin, '%P'))
+        self.sell_name_entry = tk.Entry(self.selltop, textvariable=self.sell_name_entry_var, validate='key',
+                                        validatecommand=(get_name_by_pinyin, '%P'))
         self.sell_name_entry.grid(row=2, column=0, padx=1, pady=1)
-        #显示选项的listbox
+        # 显示选项的listbox
         var1 = tk.StringVar()
-        self.sell_name_listbox = tk.Listbox(self.selltop, listvariable = var1, selectmode="browse")
+        self.sell_name_listbox = tk.Listbox(self.selltop, listvariable=var1, selectmode="browse")
         self.sell_name_listbox.grid(row=3, column=0, padx=1, pady=1)
         self.sell_name_listbox.bind("<<ListboxSelect>>", self.FuncSellComboxSelectedHander)
-        #货物数量输入框
+        # 货物数量输入框
         var2 = tk.StringVar()
-        self.sell_number_entry = tk.Entry(self.selltop, textvariable=var2, width=8, validate='key', validatecommand=(test_cmd, '%P')) #%P代表输入框的实时内容)
+        self.sell_number_entry = tk.Entry(self.selltop, textvariable=var2, width=8, validate='key',
+                                          validatecommand=(test_cmd, '%P'))  # %P代表输入框的实时内容)
         self.sell_number_entry.grid(row=2, column=1, padx=1, pady=1)
-        #货物钱数输入框（单价or总价）
+        # 货物钱数输入框（单价or总价）
         var3 = tk.StringVar()
-        self.sell_monery_entry = tk.Entry(self.selltop, textvariable=var3, width=8, validate='key', validatecommand=(test_cmd, '%P'))
+        self.sell_monery_entry = tk.Entry(self.selltop, textvariable=var3, width=8, validate='key',
+                                          validatecommand=(test_cmd, '%P'))
         self.sell_monery_entry.grid(row=2, column=2, padx=1, pady=1)
-        #按钮
-        self.sell_YesButton = tk.Button(self.selltop, text='确认', command=lambda:self.FuncButtonYes(self.selltop, 1))
+        # 按钮
+        self.sell_YesButton = tk.Button(self.selltop, text='确认', command=lambda: self.FuncButtonYes(self.selltop, 1))
         self.sell_YesButton.grid(row=3, column=1, padx=1, pady=1)
-        self.sell_CancelButton = tk.Button(self.selltop, text='取消', command=lambda:self.FuncButtonCancel(self.selltop))
+        self.sell_CancelButton = tk.Button(self.selltop, text='取消', command=lambda: self.FuncButtonCancel(self.selltop))
         self.sell_CancelButton.grid(row=3, column=2, padx=1, pady=1)
 
-        #右侧多条记录的界面
-        #label
+        # 右侧多条记录的界面
+        # label
         tk.Label(self.selltop, text='货物名称').place(x=300, y=30, width=100, height=22)
         self.sell_mull_name_entry_var = tk.StringVar()
-        self.sell_mull_name_entry = tk.Entry(self.selltop, textvariable = self.sell_mull_name_entry_var, validate='key', validatecommand=(get_name_by_pinyin, '%P'))
+        self.sell_mull_name_entry = tk.Entry(self.selltop, textvariable=self.sell_mull_name_entry_var, validate='key',
+                                             validatecommand=(get_name_by_pinyin, '%P'))
         self.sell_mull_name_entry.place(x=298, y=55, width=120, height=22)
 
-        tk.Label(self.selltop, text='货物数量').place(x=410, y=30, width=100,height=22)
+        tk.Label(self.selltop, text='货物数量').place(x=410, y=30, width=100, height=22)
         var_mull0 = tk.StringVar()
-        self.sell_mull_number_entry = tk.Entry(self.selltop, textvariable = var_mull0, validate='key', validatecommand=(test_cmd, '%P'))
+        self.sell_mull_number_entry = tk.Entry(self.selltop, textvariable=var_mull0, validate='key',
+                                               validatecommand=(test_cmd, '%P'))
         self.sell_mull_number_entry.place(x=430, y=55, width=50, height=22)
 
-        tk.Label(self.selltop, text='总金额').place(x=410, y=85, width=100, height=22)
+        tk.Label(self.selltop, text='双击来删除对应条目', fg='red').place(x=570, y=30, width=160, height=22)
+
+        tk.Label(self.selltop, text='总金额').place(x=400, y=85, width=100, height=22)
         var_mull3 = tk.StringVar()
-        self.sell_mull_money_entry = tk.Entry(self.selltop, textvariable = var_mull3, validate='key', validatecommand=(test_cmd, '%P'))
+        self.sell_mull_money_entry = tk.Entry(self.selltop, textvariable=var_mull3, validate='key',
+                                              validatecommand=(test_cmd, '%P'))
         self.sell_mull_money_entry.place(x=430, y=110, width=50, height=22)
 
-        #添加功能按钮
-        #这个添加按钮是放在货物信息右面
-        self.sell_mull_AddButtonOne = tk.Button(self.selltop, text='添加', command=lambda arg=1:self.FuncButtonSellMullAdd(arg))
+        # 添加功能按钮
+        # 这个添加按钮是放在货物信息右面
+        self.sell_mull_AddButtonOne = tk.Button(self.selltop, text='添加',
+                                                command=lambda arg=1: self.FuncButtonSellMullAdd(arg))
         self.sell_mull_AddButtonOne.place(x=500, y=55, width=50, height=22)
-        #这个按钮是放在总金额的右面
-        self.sell_mull_AddButtonTwo = tk.Button(self.selltop, text='添加', command=lambda arg=2:self.FuncButtonSellMullAdd(arg))
+        # 这个按钮是放在总金额的右面
+        self.sell_mull_AddButtonTwo = tk.Button(self.selltop, text='添加',
+                                                command=lambda arg=2: self.FuncButtonSellMullAdd(arg))
         self.sell_mull_AddButtonTwo.place(x=500, y=110, width=50, height=22)
 
-        #显示根据拼音显示出来的选项的listbox
+        # 显示根据拼音显示出来的选项的listbox
         var_mull1 = tk.StringVar()
-        self.sell_mull_name_listbox = tk.Listbox(self.selltop, listvariable = var_mull1, selectmode="browse")
-        #self.sell_mull_name_listbox.grid(row=3, column=4, padx=1, pady=1)
+        self.sell_mull_name_listbox = tk.Listbox(self.selltop, listvariable=var_mull1, selectmode="browse")
+        # self.sell_mull_name_listbox.grid(row=3, column=4, padx=1, pady=1)
         self.sell_mull_name_listbox.place(x=298, y=85, width=120, height=180)
         self.sell_mull_name_listbox.bind("<<ListboxSelect>>", self.FuncSellComboxSelectedHander)
-        #显示添加结果的列表的listbox
+        # 显示添加结果的列表的listbox
         var_mull2 = tk.StringVar()
-        self.sell_mull_result_listbox = tk.Listbox(self.selltop, listvariable = var_mull2, selectmode="browse")
+        self.sell_mull_result_listbox = tk.Listbox(self.selltop, listvariable=var_mull2, selectmode="browse")
         self.sell_mull_result_listbox.place(x=580, y=55, width=140, height=200)
+        self.sell_mull_result_listbox.bind("<Double-Button-1>", self.SellMullResultListboxDoubleClickFunc)
 
-        #确认按钮
-        self.sell_mull_YesButton = tk.Button(self.selltop, text='确认', command=lambda:self.FuncButtonYes(self.selltop, 3))
+        # 确认按钮
+        self.sell_mull_YesButton = tk.Button(self.selltop, text='确认',
+                                             command=lambda: self.FuncButtonYes(self.selltop, 3))
         self.sell_mull_YesButton.place(x=430, y=200, width=50, height=22)
-        #取消按钮
-        self.sell_mull_CancelButton = tk.Button(self.selltop, text='取消', command=lambda:self.FuncButtonCancel(self.selltop))
+        # 取消按钮
+        self.sell_mull_CancelButton = tk.Button(self.selltop, text='取消',
+                                                command=lambda: self.FuncButtonCancel(self.selltop))
         self.sell_mull_CancelButton.place(x=490, y=200, width=50, height=22)
-        #设置右侧按钮位disable状态
+        # 设置右侧按钮位disable状态
         self.sell_mull_name_entry.__setitem__('state', 'disabled')
         self.sell_mull_number_entry.__setitem__('state', 'disabled')
         self.sell_mull_money_entry.__setitem__('state', 'disabled')
@@ -504,13 +583,13 @@ class FindLocation(object):
         self.sell_mull_CancelButton.__setitem__('state', 'disabled')
 
     def FuncInput(self):
-        print 'input func'
+        # print 'input func'
         if self.child_screen_exits == True:
-            print 'child screen is exits'
+            # print 'child screen is exits'
             return
 
         self.child_screen_exits = True
-        #设置弹出窗口在主窗体的中间
+        # 设置弹出窗口在主窗体的中间
         self.root.update()
         self.Root_xoffset = self.root.winfo_x()
         self.Root_yoffset = self.root.winfo_y()
@@ -521,87 +600,94 @@ class FindLocation(object):
         self.inputtop = tk.Toplevel(self.root)
         self.inputtop.geometry(size_str)
         self.inputtop.resizable(width=False, height=False)
-        #设置右上角的X功能
-        self.inputtop.protocol("WM_DELETE_WINDOW",lambda arg=self.inputtop: self.FuncButtonCancel(arg))
-        #设置窗口始终在最上层
+        # 设置右上角的X功能
+        self.inputtop.protocol("WM_DELETE_WINDOW", lambda arg=self.inputtop: self.FuncButtonCancel(arg))
+        # 设置窗口始终在最上层
         self.inputtop.wm_attributes("-topmost", 1)
         self.inputtop.title('入库信息输入框')
-        #self.inputtop.overrideredirect(True)   #隐藏边框标题
-        #self.inputtop.positionfrom(who="user")
-        #单价or总价 切换标志
+        # self.inputtop.overrideredirect(True)   #隐藏边框标题
+        # self.inputtop.positionfrom(who="user")
+        self.toplevel_id = self.inputtop
+        # 单价or总价 切换标志
         self.sell_price_flag = False
-        #label
+        # label
         tk.Label(self.inputtop, text='货物名称').grid(row=1, column=0, padx=1, pady=1)
         tk.Label(self.inputtop, text='货物数量').grid(row=1, column=1, padx=1, pady=1)
-        #点击会自动切换显示的label
+        # 点击会自动切换显示的label
         self.sell_price_checkbutton_name = tk.StringVar()
         self.sell_price_checkbutton_name.set('单价')
-        tk.Checkbutton(self.inputtop, textvariable=self.sell_price_checkbutton_name, command=self.SellCheckFunc).grid(row=1,column=2,padx=1,pady=1)
-        #对输入进行限制的函数
+        tk.Checkbutton(self.inputtop, textvariable=self.sell_price_checkbutton_name, command=self.SellCheckFunc).grid(
+            row=1, column=2, padx=1, pady=1)
+        # 对输入进行限制的函数
         test_cmd = self.inputtop.register(self.test_input_is_digit)
-        #货物名称输入框
+        # 货物名称输入框
         var1 = tk.StringVar()
         self.input_name_entry = tk.Entry(self.inputtop, textvariable=var1, width=20)
         self.input_name_entry.grid(row=2, column=0, padx=1, pady=1)
-        #货物数量输入框
+        # 货物数量输入框
         var2 = tk.StringVar()
-        self.input_number_entry = tk.Entry(self.inputtop, textvariable=var2, width=8, validate='key', validatecommand=(test_cmd, '%P')) #%P代表输入框的实时内容)
+        self.input_number_entry = tk.Entry(self.inputtop, textvariable=var2, width=8, validate='key',
+                                           validatecommand=(test_cmd, '%P'))  # %P代表输入框的实时内容)
         self.input_number_entry.grid(row=2, column=1, padx=1, pady=1)
-        #货物钱数输入框（单价or总价）
+        # 货物钱数输入框（单价or总价）
         var3 = tk.StringVar()
-        self.input_monery_entry = tk.Entry(self.inputtop, textvariable=var3, width=8, validate='key', validatecommand=(test_cmd, '%P'))
+        self.input_monery_entry = tk.Entry(self.inputtop, textvariable=var3, width=8, validate='key',
+                                           validatecommand=(test_cmd, '%P'))
         self.input_monery_entry.grid(row=2, column=2, padx=1, pady=1)
-        #按钮
-        tk.Button(self.inputtop, text='确认', command=lambda:self.FuncButtonYes(self.inputtop, 2)).grid(row=3, column=1, padx=1, pady=1)
-        tk.Button(self.inputtop, text='取消', command=lambda:self.FuncButtonCancel(self.inputtop)).grid(row=3, column=2, padx=1, pady=1)
+        # 按钮
+        tk.Button(self.inputtop, text='确认', command=lambda: self.FuncButtonYes(self.inputtop, 2)).grid(row=3, column=1,
+                                                                                                       padx=1, pady=1)
+        tk.Button(self.inputtop, text='取消', command=lambda: self.FuncButtonCancel(self.inputtop)).grid(row=3, column=2,
+                                                                                                       padx=1, pady=1)
 
     def FuncTJDay(self):
-        print 'tongji day'
+        print('tongji day')
 
     def FuncTJMonth(self):
-        print 'tongji month'
+        print('tongji month')
 
-    def priFuncSetting(self):
-        label0 = Label(self.root, text="priFuncSetting")
-        label0.grid(column = 0)
+    def FuncSetting(self):
+        label0 = tk.Label(self.root, text="priFuncSetting")
+        label0.grid(column=0)
 
-    def priFuncHelp(self):
-        label0 = Label(self.root, text="priFuncHelp")
-        label0.grid(column = 0)
+    def FuncHelp(self):
+        label0 = tk.Label(self.root, text="priFuncHelp")
+        label0.grid(column=0)
 
-    def priFuncVersion(self):
-        label0 = Label(self.root, text="priFuncVersion")
-        label0.grid(column = 0)
+    def FuncVersion(self):
+        label0 = tk.Label(self.root, text="priFuncVersion")
+        label0.grid(column=0)
 
     def FuncUserRegister(self):
-        label0 = Label(self.root, text="FuncUserRegister")
-        label0.grid(column = 0)
+        label0 = tk.Label(self.root, text="FuncUserRegister")
+        label0.grid(column=0)
 
     def FuncUserLogin(self):
-        label0 = Label(self.root, text="FuncUserLogin")
-        label0.grid(column = 0)
+        label0 = tk.Label(self.root, text="FuncUserLogin")
+        label0.grid(column=0)
+
     def FuncUserQuit(self):
-        label0 = Label(self.root, text="FuncUserQuit")
-        label0.grid(column = 0)
+        label0 = tk.Label(self.root, text="FuncUserQuit")
+        label0.grid(column=0)
+
     # 完成布局
     def gui_arrang(self):
-
-        self.sell_button.place(         x=20,y=30,width=180,height=120)
-        self.input_button.place(        x=20,y=160,width=180,height=120)
-        self.tongji_day_button.place(   x=20,y=290,width=180,height=120)
-        self.tongji_month_button.place( x=20,y=420,width=180,height=120)
+        self.sell_button.place(x=20, y=30, width=180, height=120)
+        self.input_button.place(x=20, y=160, width=180, height=120)
+        self.tongji_day_button.place(x=20, y=290, width=180, height=120)
+        self.tongji_month_button.place(x=20, y=420, width=180, height=120)
 
         display_start_x = 230
         display_start_y = 30
-        #两侧留出20空余空间
+        # 两侧留出20空余空间
         display_width = self.RootWidth - display_start_x - 40;
-        #底部留出200空余空间
-        display_height = self.RootHeight - 200 *3/4 - 40;
+        # 底部留出200空余空间
+        display_height = self.RootHeight - 200 * 3 / 4 - 40;
         self.display_info.place(x=display_start_x, y=display_start_y, width=display_width, height=display_height)
 
         menu = tk.Menu(self.root)
-        #mb0 = Menubutton(self.root, text="用户xxx")
-        cascade0 = tk.Menu(menu, tearoff = False)
+        # mb0 = Menubutton(self.root, text="用户xxx")
+        cascade0 = tk.Menu(menu, tearoff=False)
         cascade0.add_command(label="注册", command=self.FuncUserRegister)
         cascade0.add_separator()
         cascade0.add_command(label="登陆", command=self.FuncUserLogin)
@@ -609,11 +695,11 @@ class FindLocation(object):
         cascade0.add_command(label="退出", command=self.FuncUserQuit)
         menu.add_cascade(label="用户", menu=cascade0)
 
-        menu.add_command(label='设置', command=self.priFuncSetting)
-        menu.add_command(label='帮助', command=self.priFuncHelp)
+        menu.add_command(label='设置', command=self.FuncSetting)
+        menu.add_command(label='帮助', command=self.FuncHelp)
 
-        cascade1 = tk.Menu(menu, tearoff = False)
-        cascade1.add_command(label='版本信息', command=self.priFuncVersion)
+        cascade1 = tk.Menu(menu, tearoff=False)
+        cascade1.add_command(label='版本信息', command=self.FuncVersion)
         cascade1.add_separator()
         cascade1.add_checkbutton(label='试用30天')
         cascade1.add_separator()
@@ -623,6 +709,7 @@ class FindLocation(object):
 
         self.root['menu'] = menu
 
+
 def main():
     # 初始化对象
     FL = FindLocation()
@@ -631,6 +718,7 @@ def main():
     # 主程序执行
     tk.mainloop()
     pass
+
 
 if __name__ == "__main__":
     main()
