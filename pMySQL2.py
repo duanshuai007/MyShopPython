@@ -8,7 +8,7 @@ import operator
 #在windows下使用localhost会出现10061错误
 DB_IP = '127.0.0.1'
 DB_NAME = 'myshop'
-DB_USER = 'root'
+DB_USER = 'shop'
 DB_PASSWD = '123'
 TB_NAME = 'date0314'
 #免费时长, 计时周期,周期单价,最大计时时间,
@@ -29,10 +29,13 @@ def createdb(name):
         cursor.execute('show databases')
         rows = cursor.fetchall()
         for row in rows:
-            row_name = '%s' % row
-            ret = operator.eq(name, row_name)
-            if ret == 0:
-                #print "DataBase Already Exits"
+            #row_name = '%s' % row
+            row_name = "{}".format(row[0])
+            #ret = operator.eq(name, row_name)
+            #if ret == 0:
+            #print("row = {}, row_name = {}".format(row[0], row_name))
+            if name == row_name:
+                print("DataBase Already Exits")
                 return True
         sql = 'create database %s' % name
         cursor.execute(sql)
@@ -62,10 +65,12 @@ def createtable(strdate):
         cursor.execute('show tables')
         rows = cursor.fetchall()
         for row in rows:
-            row_name = '%s' % row
-            result = operator.eq(name, row_name)
-            if result == 0:
-                #print "DataBase Already Exits"
+            #row_name = '%s' % row
+            row_name = "{}".format(row[0])
+            #result = operator.eq(name, row_name)
+            #if result == 0:
+            if name == row_name:
+                print("DataBase Already Exits")
                 return name
 
         sql = 'create table %s(\
@@ -178,13 +183,14 @@ def putInStorage(tbname, str_list):
 
     flag = str_list[0]
     name = str_list[1]
-    number = str_list[2]
-    money = str_list[3]
+    name_pinyin = str_list[2]
+    number = str_list[3]
+    money = str_list[4]
     datetime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))  
     try:
         sql = 'insert into %s' % tbname + \
-              '(c20Name, InTime, TotalNum, InPrice)' + \
-              ' values(\'%s\', \'%s\', %d, %f)' % (name, datetime, number, money)
+              '(c20Name, c20SName, InTime, TotalNum, InPrice)' + \
+              ' values(\'%s\', \'%s\', \'%s\', %d, %f)' % (name, name_pinyin, datetime, number, money)
         #print sql
         cursor.execute(sql)
         db.commit()

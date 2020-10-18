@@ -89,13 +89,16 @@ class FindLocation(object):
 
                     for new_item in ret_list:  # 从数据库的数据中提取出一条信息
                         isInDisplay = False
-                        new_item_name = '%s' % new_item[1]  # 获取名字信息
+                        #new_item_name = '%s' % new_item[1]  # 获取名字信息
+                        new_item_name = "{}".format(new_item[1])
                         for item in alreadyExitsItem:  # 从显示列表中提取一条信息
                             item_text = self.display_info.item(item, "values")
                             # print(item_text[1])#输出所选行的第一列的值
-                            item_name = '%s' % item_text[1]  # 获取显示的名字信息
-                            result = cmp(item_name, new_item_name)
-                            if result == 0:
+                            #item_name = '%s' % item_text[1]  # 获取显示的名字信息
+                            item_name = "{}".format(item_text[1])
+                            #result = cmp(item_name, new_item_name)
+                            #if result == 0:
+                            if item_name == new_item_name:
                                 isInDisplay = True
                                 break
                         if isInDisplay == False:
@@ -177,13 +180,14 @@ class FindLocation(object):
     def FuncButtonYes(self, screenid, flag):
         # print 'sellyes'
         # 将数据提取组成mysql格式字符串，调用mysql，写入到数据库中
+        print("1111")
         if self.child_screen_exits == False:
             return
-
+        print("2222")
         try:
             if flag == 1:
                 # 售出货物界面按下确认键
-                # print 'flag = 1'
+                print('flag = 1')
                 name = self.sell_name_entry.get()
                 number_str = self.sell_number_entry.get()
                 money_str = self.sell_monery_entry.get()
@@ -192,16 +196,19 @@ class FindLocation(object):
                     self.ShowMessageBox('请输入有效数据')
                     return
 
+                print("name = {} number = {} money = {}".format(name, number_str, money_str))
+                ''' 
                 for val in name:
                     if val >= 'a' and val <= 'z':
                         name = self.sell_name_listbox.get(0)
-                        # print name
+                        print("name={}".format(name))
                     elif val >= 'A' and val <= 'Z':
                         name = self.sell_name_listbox.get(0)
-                        # print name
+                        print("name={}".format(name))
                     else:
+                        print("name={}".format(name))
                         break
-
+                '''
                 input_number = int(number_str, 10)
                 input_money = float(money_str)
 
@@ -213,7 +220,11 @@ class FindLocation(object):
                 name = self.input_name_entry.get()
                 number_str = self.input_number_entry.get()
                 money_str = self.input_monery_entry.get()
-
+                unicode_name = u'%s' % name
+                # print unicode_name
+                name_pinyin = xpinyin.Pinyin().get_pinyin(unicode_name)
+                print("name={} py={}".format(name, name_pinyin))
+                
                 if not name or not number_str or not money_str:
                     # tkm.showinfo('警告','请输入有效数据')
                     self.ShowMessageBox('请输入有效数据')
@@ -233,6 +244,7 @@ class FindLocation(object):
                 mysql_string_list = []
                 mysql_string_list.append('insert')
                 mysql_string_list.append(name)
+                mysql_string_list.append(name_pinyin)
                 mysql_string_list.append(input_number)
                 mysql_string_list.append(money)
                 print(mysql_string_list)
