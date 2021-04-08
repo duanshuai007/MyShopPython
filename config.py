@@ -17,7 +17,7 @@ class config():
 			sys.exit(1)
 		self.filepath = configfilename
 		self.config = configparser.ConfigParser()
-		self.config.read(configfilename)
+		self.config.read(configfilename, encoding="utf-8")
 		pass
 
 	def get_as_dict(self):
@@ -40,7 +40,7 @@ class config():
 	def set(self:object, string:str, substring:str, value:str)->bool:
 		try:
 			self.config.set(string, substring, value)
-			with open(self.filepath, 'w') as f:
+			with open(self.filepath, 'w', encoding="utf-8") as f:
 				self.config.write(f)
 			return True
 		except Exception as e:
@@ -48,14 +48,12 @@ class config():
 			return False
 
 if __name__ == "__main__":
-	c = config("./config.ini")
+	rootdir = os.path.abspath(os.path.dirname(__file__))
+	p = "{}/{}".format(rootdir, "config.ini")
+	c = config(p)
 	s = c.get_as_dict()
-	#print(s)
-	print(s["device_doorno"]["862167051501249"])
-	print(s["device_doorno"]["862167051501082"])
-	print(s["device_doorno"]["862167051501413"])
-	import time
-	while True:
-		s = config("./config.ini").get_as_dict()
-		print(s["table"]["862167051501413"])
-		time.sleep(1)
+	print(s)
+
+	r = c.get("database", "host")
+	print(r)
+	c.set("database", "host", "192.168.200.130")

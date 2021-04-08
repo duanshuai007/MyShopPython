@@ -10,7 +10,7 @@ import re
 import threading
 import xpinyin
 
-import pMySQL2 as mysql
+from warehouse import warehouse
 from logger import LoggingConsumer, LoggingProducer
 
 # 登陆功能 https://www.cnblogs.com/wwf828/p/7418181.html#autoid-15-0-0
@@ -22,7 +22,7 @@ class FindLocation(object):
 			#初始化log接口
 			self.logger = LoggingProducer().get_default_logger()
 			#初始化数据库接口
-			self.db = mysql.db()
+			self.db = warehouse()
 			#初始化显示接口
 			self.root = tk.Tk()
 			# 给主窗口设置标题内容
@@ -42,32 +42,26 @@ class FindLocation(object):
 			self.sell_flag = False  # 用来判断是单条记录还是多条记录的标志位
 			self.toplevel_id = 0
 			# 查询是否有今日的表，如果没有就创建今日表
-			#datestr = time.strftime('%Y%m%d', time.localtime(time.time()))
-			datestr = time.strftime('%Y%m%d')
-			self.db.create('myshop')
-			self.TableName = self.db.createtable(datestr)
+			self.db.create_db()
+			#self.db.create_tb()
 
 			self.goodsNameList = []
 
 			# 参考自https://cloud.tencent.com/developer/ask/130543
 			# 参考自https://www.cnblogs.com/qwangxiao/p/9940972.html
-			clos = ( 'id', '货物', '英文名', '入库时间', '出库时间', '总库存', '已卖数量', '进货价格', '售价', '打包id', '打包价格')
+			clos = ('编号', '商品名称', '入库数量', '已卖数量', '库存剩余', '总成本', '总收入')
 			self.display_info = ttk.Treeview(self.root, columns=clos, show='headings')
 			for col in clos:
 				self.display_info.heading(col, text=col)
 			self.display_info.grid(row=1, column=0, columnspan=2)
 			# 设置列的宽度和对齐方式
-			self.display_info.column('0', width=60, anchor='center')
-			self.display_info.column('1', width=30, anchor='n')
-			self.display_info.column('2', width=90, anchor='ne')
-			self.display_info.column('3', width=130, anchor='n')
-			self.display_info.column('4', width=130, anchor='n')
-			self.display_info.column('5', width=70, anchor='center')
-			self.display_info.column('6', width=70, anchor='center')
-			self.display_info.column('7', width=70, anchor='center')
-			self.display_info.column('8', width=70, anchor='center')
-			self.display_info.column('9', width=70, anchor='center')
-			self.display_info.column('10', width=70, anchor='center')
+			self.display_info.column('0', width=30, anchor='center')
+			self.display_info.column('1', width=90, anchor='center')
+			self.display_info.column('2', width=30, anchor='ne')
+			self.display_info.column('3', width=30, anchor='n')
+			self.display_info.column('4', width=30, anchor='center')
+			self.display_info.column('5', width=60, anchor='center')
+			self.display_info.column('6', width=60, anchor='center')
 			# 创建一个查询结果的按钮
 			self.sell_button = tk.Button(self.root, command=self.FuncSell, text="售出", bd=10, bg='white', font=("黑体", 36))
 			self.input_button = tk.Button(self.root, command=self.FuncInput, text="入库", bd=10, bg='white', font=("黑体", 36))
@@ -78,42 +72,74 @@ class FindLocation(object):
 			t1.setDaemon(True)
 			t1.start()
 		except Exception as e:
-			self.logger.error("class init error:{}".format(e))	
+			self.logger.error("class init error:{}".format(e))
 
 	def ThreadUpdateDisplay(self):
-		display_len = 0
-
+		self.display_need_update = True
 		while True:
 			try:
-				display_list_info = []
-				ret_list = self.db.getItem(self.TableName)
-				if ret_list:
-					if len(ret_list) != display_len:
-						display_len = len(ret_list)
-						ret_list.sort(key=lambda e: e[1], reverse=True)
-						alreadyExitsItem = self.display_info.get_children()
-						for new_item in ret_list:  # 从数据库的数据中提取出一条信息
-							isInDisplay = False
-							new_item_name = "{}".format(new_item[1])
-							for item in alreadyExitsItem:  # 从显示列表中提取一条信息
-								item_text = self.display_info.item(item, "values")
-								item_name = "{}".format(item_text[1])
-								if item_name == new_item_name:
-									isInDisplay = True
-									break
-							if isInDisplay == False:
-								display_list_info.append(new_item)
-								# 将获取到的商品名加入到goodsNameList中，不能重复加入，并将名称转换为拼音
-								unicode_name = u'%s' % new_item_name
-								name_pinyin = xpinyin.Pinyin().get_pinyin(unicode_name)
-								self.goodsNameList.append([new_item_name, name_pinyin])
-								self.logger.info("新货物:name={} pinyin={}".format(new_item_name, name_pinyin))
-								self.logger.info(self.goodsNameList)
-				# print display_list_info
-				if display_list_info:
+				if self.display_need_update is True:
+					self.display_need_update = False
+					#display_list_info = []
+					dbmsg_list = self.db.getall()
+					dbmsg_list.sort(key=lambda e: e[0], reverse=False)
+					alreadyExitsItem = self.display_info.get_children()
+					'''
+					for dbitem in dbmsg_list:  # 从数据库的数据中提取出一条信息
+						need_update = True
+						in_display = False
+						for displayitem in alreadyExitsItem:  # 从显示列表中提取一条信息
+							displayitem_text = self.display_info.item(displayitem, "values")
+							#比较商品编号
+							#self.logger.info("{} type={} {} type={}".format(displayitem_text[0], type(displayitem_text[0]), dbitem[0], type(dbitem[0])))
+							if dbitem[0] == int(displayitem_text[0]):
+								in_display = True
+								#比较商品的库存数量,卖出数量,成本,收入,如果不相同,则删除该条记录重新加入
+								if dbitem[3] == int(displayitem_text[2]) and dbitem[4] == int(displayitem_text[3]) and dbitem[5] == float(displayitem_text[5]) and dbitem[6] == float(displayitem_text[6]):
+									need_update = False
+								else:
+									self.logger.info("delete")
+									self.display_info.delete(displayitem)
+								break
+
+						if in_display is False or (in_display is True and need_update is True):
+							display_item = [dbitem[0], dbitem[1], dbitem[3], dbitem[4], dbitem[3] - dbitem[4], dbitem[5], dbitem[6]]
+							display_list_info.append(display_item)
+							self.goodsNameList.append([dbitem[0], dbitem[1], dbitem[2]])
+							self.logger.info("新货物:id={} name={} pinyin={}".format(dbitem[0], dbitem[1], dbitem[2]))
+							#self.logger.info(self.goodsNameList)
 					for item in display_list_info:
-						self.display_info.insert("", "end", values=item)
-				time.sleep(1)
+						self.logger.info("insert")
+						self.display_info.insert("", "end", 'item%i'%item[0], values=item)
+					'''
+					for dbitem in dbmsg_list:
+						in_display = False
+						for displayitem in alreadyExitsItem:
+							displayitem_text = self.display_info.item(displayitem, "values")
+							if dbitem[0] == int(displayitem_text[0]):
+								in_display = True
+								#更新总库存数量显示
+								if  dbitem[3] != int(displayitem_text[2]):
+									self.display_info.set(displayitem, 2, dbitem[3])
+								#更新已售出数量显示
+								if dbitem[4] != int(displayitem_text[3]):
+									self.display_info.set(displayitem, 3, dbitem[4])
+								#更新总成本显示
+								if dbitem[5] != float(displayitem_text[5]):
+									self.display_info.set(displayitem, 5, dbitem[5])
+								#更新总收入显示
+								if dbitem[6] != float(displayitem_text[6]):
+									self.display_info.set(displayitem, 6, dbitem[6])
+								#更新剩余库存数量显示
+								self.display_info.set(displayitem, 4, dbitem[3] - dbitem[4])
+								break
+						if in_display is False:
+							#id, 商品名, 商品名拼音, 总库存, 总售出数量, 库存剩余, 总成本, 总收入
+							item = [dbitem[0], dbitem[1], dbitem[3], dbitem[4], dbitem[3] - dbitem[4], dbitem[5], dbitem[6]]
+							self.display_info.insert("", "end", values=item)
+							self.goodsNameList.append([dbitem[0], dbitem[1], dbitem[2]])
+										
+				time.sleep(0.1)
 			except Exception as e:
 				self.logger.error("ThreadUpdateDisplay error:{}".format(e))
 
@@ -121,24 +147,27 @@ class FindLocation(object):
 	#    topid.destroy()
 	#    self.messagebox_exits = False
 
+
+	def create_window_size(self, width, height):
+		self.root.update()
+		xoffset = self.root.winfo_x()
+		yoffset = self.root.winfo_y()
+		child_width = int(((self.RootWidth - width) / 2) + xoffset)
+		child_height = int(((self.RootHeight - height) / 2) + yoffset)
+		#size_str = '{}x{}+{}+{}'.format(width, height, child_width, child_height)
+		return '{}x{}+{}+{}'.format(width, height, child_width, child_height)
+
 	def ShowMessageBox(self, msg):
 		if self.messagebox_exits == True:
 			return
 		try:
 			self.messagebox_exits = True
 
-			self.root.update()
-			sell_win_width = 240
-			sell_win_height = 80
-			self.Root_xoffset = self.root.winfo_x()
-			self.Root_yoffset = self.root.winfo_y()
-			child_width = int(((self.RootWidth - sell_win_width) / 2) + self.Root_xoffset)
-			child_height = int(((self.RootHeight - sell_win_height) / 2) + self.Root_yoffset)
-			size_str = '{}x{}+{}+{}'.format(sell_win_width, sell_win_height, child_width, child_height)
+			size = self.create_window_size(240, 80)
 
 			thisTop = tk.Toplevel(self.toplevel_id)
 			thisTop.resizable(False, False)
-			thisTop.geometry(size_str)
+			thisTop.geometry(size)
 			thisTop.wm_attributes('-topmost', True)
 			# 设置右上角的X功能
 			thisTop.protocol("WM_DELETE_WINDOW", lambda arg=thisTop: self.FuncButtonCancel(arg))
@@ -181,7 +210,6 @@ class FindLocation(object):
 	# flag = 2 表示商品入库的分支
 	# flag = 3 表示多个商品卖出的分支
 	def FuncButtonYes(self, screenid, flag):
-		# 将数据提取组成mysql格式字符串，调用mysql，写入到数据库中
 		if self.child_screen_exits == False:
 			return
 		self.logger.info("press FuncButtonYes")
@@ -193,44 +221,61 @@ class FindLocation(object):
 				number_str = self.sell_number_entry.get()
 				money_str = self.sell_monery_entry.get()
 				if not name or not number_str or not money_str:
-					# tkm.showinfo('警告','请输入有效数据')
 					self.ShowMessageBox('请输入有效数据')
 					return
-				#print("name = {} number = {} money = {}".format(name, number_str, money_str))
 				self.logger.info("售出:name = {} number = {} money = {}".format(name, number_str, money_str))
-				''' 
-				for val in name:
-					if val >= 'a' and val <= 'z':
-						name = self.sell_name_listbox.get(0)
-						print("name={}".format(name))
-					elif val >= 'A' and val <= 'Z':
-						name = self.sell_name_listbox.get(0)
-						print("name={}".format(name))
-					else:
-						print("name={}".format(name))
+				
+				flag = False
+				for display_item in self.goodsNameList:
+					if name == display_item[1]:
+						name_pinyin = display_item[2]
+						product_id = display_item[0]
+						flag = True
 						break
-				'''
+				if flag is False:
+					#没在goodnamelist中找到对应货物，视其为新货物
+					self.logger.error("can not find good name")
+					self.ShowMessageBox('没能发现对应的货物')
+					return
+
 				input_number = int(number_str, 10)
 				input_money = float(money_str)
-				money = 0
+
+				# 需要知道历史上数据库中保存的商品库存情况
+#unicode_name = u'%s' % name
+#				name_pinyin = xpinyin.Pinyin().get_pinyin(unicode_name)
+				record_list = [[product_id, name, name_pinyin, 1, input_number, input_money],]
+				self.db.update(record_list)
+				self.display_need_update = True
 			elif flag == 2:
 				# 货物入库界面按下确认键
 				self.logger.info("入库货物")
 				name = self.input_name_entry.get()
 				number_str = self.input_number_entry.get()
 				money_str = self.input_monery_entry.get()
-				unicode_name = u'%s' % name
-				name_pinyin = xpinyin.Pinyin().get_pinyin(unicode_name)
-				self.logger.info("name={} py={}".format(name, name_pinyin))
 				
 				if not name or not number_str or not money_str:
 					self.ShowMessageBox('请输入有效数据')
 					return
 
+				#在goodnamelist中寻找对应货物名称
+				flag = False
+				for display_item in self.goodsNameList:
+					if name == display_item[1]:
+						name_pinyin = display_item[2]
+						product_id = display_item[0]
+						flag = True
+						break
+				if flag is False:
+					#没在goodnamelist中找到对应货物，视其为新货物
+					unicode_name = u'%s' % name
+					name_pinyin = xpinyin.Pinyin().get_pinyin(unicode_name)
+					product_id = None
+				self.logger.info("id={} name={} py={}".format(product_id, name, name_pinyin))
+
 				input_number = int(number_str, 10)
 				input_money = float(money_str)
 
-				money = 0
 				if self.sell_price_flag == True:
 					# print '总价格'
 					money = input_money
@@ -238,9 +283,10 @@ class FindLocation(object):
 					# print '单独价格'
 					money = input_number * input_money
 
-				mysql_string_list = [name, name_pinyin, input_number, money]
-				self.logger.info(mysql_string_list)
-				self.db.putInStorage(self.TableName, mysql_string_list)
+				record_list = [[product_id, name, name_pinyin, 0, input_number, money],]
+				self.logger.info(record_list)
+				self.db.update(record_list)
+				self.display_need_update = True
 			elif flag == 3:
 				num = self.sell_mull_result_listbox.size()
 				# print 'have %d' % num
@@ -256,6 +302,7 @@ class FindLocation(object):
 
 				# tkm.showinfo('警告','请确认数据输入是否正确!')
 				self.ShowMessageBox('数据有错误')
+				self.display_need_update = True
 			else:
 				self.logger.info('other widget button')
 		except Exception as e:
@@ -349,7 +396,7 @@ class FindLocation(object):
 
 		self.logger.info("get_name_by_pinyin_func: ret={} content={}".format(ret, content))
 		if ret or content == "":
-			for name, name_pinyin in self.goodsNameList:
+			for proid, name, name_pinyin in self.goodsNameList:
 				name_pinyin_list = name_pinyin.split('-')
 				content_len = len(content) - 1
 				ch_pos = 0
@@ -452,17 +499,9 @@ class FindLocation(object):
 		self.child_screen_exits = True
 		##左侧的单次卖出窗口
 		# 设置弹出窗口在主窗体的中间
-		self.root.update()
-		sell_win_width = 800
-		sell_win_height = 280
-		self.Root_xoffset = self.root.winfo_x()
-		self.Root_yoffset = self.root.winfo_y()
-		child_width = int(((self.RootWidth - sell_win_width) / 2) + self.Root_xoffset)
-		child_height = int(((self.RootHeight - sell_win_height) / 2) + self.Root_yoffset)
-		size_str = '{}x{}+{}+{}'.format(sell_win_width, sell_win_height, child_width, child_height)
-
+		size = self.create_window_size(800, 280)
 		self.selltop = tk.Toplevel(self.root)
-		self.selltop.geometry(size_str)
+		self.selltop.geometry(size)
 		self.selltop.resizable(width=False, height=False)
 		# 设置右上角的X功能
 		self.selltop.protocol("WM_DELETE_WINDOW", lambda arg=self.selltop: self.FuncButtonCancel(arg))
@@ -478,9 +517,9 @@ class FindLocation(object):
 					   command=self.sellRadiobuttonFunc).grid(row=0, column=0, padx=10, pady=1, columnspan=3)
 		tk.Radiobutton(self.selltop, text='组合记录', variable=self.sell_radiobutton_var, value=2,
 					   command=self.sellRadiobuttonFunc).grid(row=0, column=4, padx=10, pady=1, columnspan=6)
-		# 画布
+		# 画布 绘制中间的分割线
 		canvas_width = 20
-		canvas_height = sell_win_height - 5
+		canvas_height = 275
 		canvas = tk.Canvas(self.selltop, width=canvas_width, height=canvas_height)
 		# canvas.place(x=10,y=10, width=100, height=200)
 		canvas.grid(row=0, column=3, padx=1, pady=1, rowspan=10)
@@ -589,15 +628,61 @@ class FindLocation(object):
 
 		self.child_screen_exits = True
 		# 设置弹出窗口在主窗体的中间
-		self.root.update()
-		self.Root_xoffset = self.root.winfo_x()
-		self.Root_yoffset = self.root.winfo_y()
-		child_width = int(((self.RootWidth - 280) / 2) + self.Root_xoffset)
-		child_height = int(((self.RootHeight - 80) / 2) + self.Root_yoffset)
-		size_str = '280x80+{}+{}'.format(child_width, child_height)
+		size = self.create_window_size(280, 80)
+		inputtop = tk.Toplevel(self.root)
+		inputtop.geometry(size)
+		inputtop.resizable(width=False, height=False)
+		# 设置右上角的X功能
+		inputtop.protocol("WM_DELETE_WINDOW", lambda arg=inputtop: self.FuncButtonCancel(arg))
+		# 设置窗口始终在最上层
+		inputtop.wm_attributes("-topmost", 1)
+		inputtop.title('入库信息输入框')
+		# self.inputtop.overrideredirect(True)   #隐藏边框标题
+		# self.inputtop.positionfrom(who="user")
+		self.toplevel_id = inputtop
+		# 单价or总价 切换标志
+		self.sell_price_flag = False
+		# label
+		tk.Label(inputtop, text='货物名称').grid(row=1, column=0, padx=1, pady=1)
+		tk.Label(inputtop, text='货物数量').grid(row=1, column=1, padx=1, pady=1)
+		# 点击会自动切换显示的label
+		self.sell_price_checkbutton_name = tk.StringVar()
+		self.sell_price_checkbutton_name.set('单价')
+		tk.Checkbutton(inputtop, textvariable=self.sell_price_checkbutton_name, command=self.SellCheckFunc).grid(
+			row=1, column=2, padx=1, pady=1)
+		# 对输入进行限制的函数
+		check_input_is_number_handler = inputtop.register(self.check_input_is_number)
+		check_input_is_not_number_and_speacil_handler = inputtop.register(self.check_input_is_not_number_and_speacil)
+		# 货物名称输入框
+		var1 = tk.StringVar()
+		#self.input_name_entry = tk.Entry(self.inputtop, textvariable=var1, width=20)
+		self.input_name_entry = tk.Entry(inputtop, textvariable=var1, width=20, validate='key',
+											validatecommand=(check_input_is_not_number_and_speacil_handler, '%P'))
+		self.input_name_entry.grid(row=2, column=0, padx=1, pady=1)
+		# 货物数量输入框
+		var2 = tk.StringVar()
+		self.input_number_entry = tk.Entry(inputtop, textvariable=var2, width=8, validate='key',
+										   validatecommand=(check_input_is_number_handler, '%P'))  # %P代表输入框的实时内容)
+		self.input_number_entry.grid(row=2, column=1, padx=1, pady=1)
+		# 货物钱数输入框（单价or总价）
+		var3 = tk.StringVar()
+		self.input_monery_entry = tk.Entry(inputtop, textvariable=var3, width=8, validate='key',
+										   validatecommand=(check_input_is_number_handler, '%P'))
+		self.input_monery_entry.grid(row=2, column=2, padx=1, pady=1)
+		# 按钮
+		tk.Button(inputtop, text='确认', command=lambda: self.FuncButtonYes(inputtop, 2)).grid(row=3, column=1,
+																									   padx=1, pady=1)
+		tk.Button(inputtop, text='取消', command=lambda: self.FuncButtonCancel(inputtop)).grid(row=3, column=2,
+																									   padx=1, pady=1)
 
+	def FuncTJDay(self):
+		if self.child_screen_exits == True:
+			return
+
+		self.child_screen_exits = True
+		'''
 		self.inputtop = tk.Toplevel(self.root)
-		self.inputtop.geometry(size_str)
+		self.inputtop.geometry(size)
 		self.inputtop.resizable(width=False, height=False)
 		# 设置右上角的X功能
 		self.inputtop.protocol("WM_DELETE_WINDOW", lambda arg=self.inputtop: self.FuncButtonCancel(arg))
@@ -607,43 +692,13 @@ class FindLocation(object):
 		# self.inputtop.overrideredirect(True)   #隐藏边框标题
 		# self.inputtop.positionfrom(who="user")
 		self.toplevel_id = self.inputtop
-		# 单价or总价 切换标志
-		self.sell_price_flag = False
-		# label
-		tk.Label(self.inputtop, text='货物名称').grid(row=1, column=0, padx=1, pady=1)
-		tk.Label(self.inputtop, text='货物数量').grid(row=1, column=1, padx=1, pady=1)
-		# 点击会自动切换显示的label
-		self.sell_price_checkbutton_name = tk.StringVar()
-		self.sell_price_checkbutton_name.set('单价')
-		tk.Checkbutton(self.inputtop, textvariable=self.sell_price_checkbutton_name, command=self.SellCheckFunc).grid(
-			row=1, column=2, padx=1, pady=1)
-		# 对输入进行限制的函数
-		check_input_is_number_handler = self.inputtop.register(self.check_input_is_number)
-		check_input_is_not_number_and_speacil_handler = self.inputtop.register(self.check_input_is_not_number_and_speacil)
-		# 货物名称输入框
-		var1 = tk.StringVar()
-		#self.input_name_entry = tk.Entry(self.inputtop, textvariable=var1, width=20)
-		self.input_name_entry = tk.Entry(self.inputtop, textvariable=var1, width=20, validate='key',
-											validatecommand=(check_input_is_not_number_and_speacil_handler, '%P'))
-		self.input_name_entry.grid(row=2, column=0, padx=1, pady=1)
-		# 货物数量输入框
-		var2 = tk.StringVar()
-		self.input_number_entry = tk.Entry(self.inputtop, textvariable=var2, width=8, validate='key',
-										   validatecommand=(check_input_is_number_handler, '%P'))  # %P代表输入框的实时内容)
-		self.input_number_entry.grid(row=2, column=1, padx=1, pady=1)
-		# 货物钱数输入框（单价or总价）
-		var3 = tk.StringVar()
-		self.input_monery_entry = tk.Entry(self.inputtop, textvariable=var3, width=8, validate='key',
-										   validatecommand=(check_input_is_number_handler, '%P'))
-		self.input_monery_entry.grid(row=2, column=2, padx=1, pady=1)
-		# 按钮
-		tk.Button(self.inputtop, text='确认', command=lambda: self.FuncButtonYes(self.inputtop, 2)).grid(row=3, column=1,
-																									   padx=1, pady=1)
-		tk.Button(self.inputtop, text='取消', command=lambda: self.FuncButtonCancel(self.inputtop)).grid(row=3, column=2,
-																									   padx=1, pady=1)
+		
+		'''
+		
 
-	def FuncTJDay(self):
-		print('tongji day')
+		size = self.create_window_size(800, 280)
+		print(size)
+		self.child_screen_exits = False
 
 	def FuncTJMonth(self):
 		print('tongji month')
@@ -721,7 +776,6 @@ def main():
 	# 主程序执行
 	tk.mainloop()
 	pass
-
 
 if __name__ == "__main__":
 	main()
