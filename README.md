@@ -51,4 +51,12 @@ default-storage-engine=INNODB
 
 3.创建数据库
 
-`create database myshop;`
+`create database warehouse;`
+
+
+
+## On Ubuntu 20.04 install python mysql
+
+apt-get install mysql-server
+apt-get install libmysqlclient-dev
+pip3 install mysqlclient
