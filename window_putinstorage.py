@@ -81,13 +81,19 @@ class window_put_in_storage():
 			main_width = int(global_variable.main_window['size']['w'])
 			main_height = int(global_variable.main_window['size']['h'])
 			child_width = int(main_width * width_percent)
-			child_height = int(main_height * height_percent)
-			if child_height < 90:
-				child_height = 90
+			#child_height = int(main_height * height_percent)
+			child_height = 90
+			#if child_height < 90:
+			#	child_height = 90
+			if child_width > 290:
+				child_width = 290
+			#if child_height > 90:
+			#	child_height = 90
 			x = int(((main_width - child_width) / 2) + xoffset)
 			y = int(((main_height - child_height) / 2) + yoffset)
 			size = '{}x{}+{}+{}'.format(child_width, child_height, x, y)
 
+			print(size)
 			inputtop = tk.Toplevel(self.root)
 			inputtop.geometry(size)
 			inputtop.resizable(width=False, height=False)

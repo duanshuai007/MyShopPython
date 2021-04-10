@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
-# from tkinter import *
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkm
@@ -159,7 +158,7 @@ class FindLocation(object):
 				self.logger.error("ThreadUpdateDisplay error:{}".format(e))
 
 	def FuncSell(self):
-		self.windos_sellgoods.show(0.6, 0.4)
+		self.windos_sellgoods.show(0.75, 0.65)
 
 	def FuncInput(self):
 		self.window_putinstorage.show(0.3, 0.1)
@@ -178,35 +177,28 @@ class FindLocation(object):
 		# self.inputtop.positionfrom(who="user")
 		self.toplevel_id = self.inputtop
 		'''
-		size = self.create_window_size(800, 280)
 		tkm.showinfo('警告','已存在总金额信息')
 
 	def FuncTJMonth(self):
-		print('tongji month')
+		self.logger.info(' FuncTJMonth')
 
 	def FuncSetting(self):
-		label0 = tk.Label(self.root, text="priFuncSetting")
-		label0.grid(column=0)
+		self.logger.info(' FuncSetting')
 
 	def FuncHelp(self):
-		label0 = tk.Label(self.root, text="priFuncHelp")
-		label0.grid(column=0)
+		self.logger.info(' FuncHelp')
 
 	def FuncVersion(self):
-		label0 = tk.Label(self.root, text="priFuncVersion")
-		label0.grid(column=0)
+		self.logger.info(' FuncVersion')
 
 	def FuncUserRegister(self):
-		label0 = tk.Label(self.root, text="FuncUserRegister")
-		label0.grid(column=0)
+		self.logger.info(' FuncUserRegister')
 
 	def FuncUserLogin(self):
-		label0 = tk.Label(self.root, text="FuncUserLogin")
-		label0.grid(column=0)
+		self.logger.info(' FuncUserLogin')
 
 	def FuncUserQuit(self):
-		label0 = tk.Label(self.root, text="FuncUserQuit")
-		label0.grid(column=0)
+		self.logger.info(' FuncUserQuit')
 
 	# 完成布局
 	def gui_arrang(self):
@@ -219,7 +211,6 @@ class FindLocation(object):
 		cascade0.add_separator()
 		cascade0.add_command(label="退出", command=self.FuncUserQuit)
 		menu.add_cascade(label="用户", menu=cascade0)
-
 		menu.add_command(label='设置', command=self.FuncSetting)
 		menu.add_command(label='帮助', command=self.FuncHelp)
 

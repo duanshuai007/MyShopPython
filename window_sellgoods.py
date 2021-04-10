@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 #-*- coding:utf-8 -*-
 
+import re
 import tkinter as tk
 import global_variable
 
 class windos_sell_goods():
+	single_sell_item_list = []
+	mull_sell_item_list = []
 	def __init__(self, root, db, check_input, msgbox, queue, logger):
 		self.logger = logger
 		self.root = root
@@ -19,10 +22,10 @@ class windos_sell_goods():
 		screenid.destroy()
 		global_variable.child_exists = False
 
-	def __button_confirm_callback(self, scrrenid):
+	def __button_confirm_callback(self, scrrenid, flag):
 		try:
 			if flag == 1:
-				# 售出货物界面按下确认键
+				# 单件商品卖出按下确认键
 				self.logger.info("售出货物")
 				name = self.sell_name_entry.get()
 				number_str = self.sell_number_entry.get()
@@ -53,22 +56,19 @@ class windos_sell_goods():
 				self.db.update(record_list)
 				self.queue.put('update')
 			elif flag == 2:
-				num = self.sell_mull_result_listbox.size()
-				# print 'have %d' % num
-				if num < 2:
-					# tkm.showinfo('警告','请确认数据输入是否正确!')
-					self.ShowMessageBox('数据有错误')
-					self.msgbox.show(scrrenid, 240, 80, '数据有错误')
+				# 多件商品混合卖出按下确认键
+				money_str = self.sell_mull_money_entry.get()
+				if not money_str:
+					self.msgbox.show(self.toplevel, 240, 80, '请输入总金额')
 					return
-
+				num = self.sell_mull_result_listbox.size()
 				for val in self.sell_mull_result_listbox.get(0, last='end'):
-					if val.startswith('total'):
-						print('date right')
-						return
-
+					print(val)
+				self.logger.info("num={} money={}".format(num, money_str))
+				#因为混合销售的方式还没确定怎么计算优惠，可能无法于数据库的数据对应，所以先不更新数据库
 				# tkm.showinfo('警告','请确认数据输入是否正确!')
-				self.msgbox.show(scrrenid, 240, 80, '数据有错误')
-				self.queue.put('update')
+				#self.msgbox.show(scrrenid, 240, 80, '数据有错误')
+				#self.queue.put('update')
 			else:
 				self.logger.info('other widget button')
 		except Exception as e:
@@ -78,40 +78,16 @@ class windos_sell_goods():
 		who = self.sell_radiobutton_var.get()
 		if who == '1':
 			self.sell_flag = False
-			self.sell_name_entry.__setitem__('state', 'normal')
-			self.sell_number_entry.__setitem__('state', 'normal')
-			self.sell_monery_entry.__setitem__('state', 'normal')
-			self.sell_name_listbox.__setitem__('state', 'normal')
-			self.sell_YesButton.__setitem__('state', 'normal')
-			self.sell_CancelButton.__setitem__('state', 'normal')
-
-			self.sell_mull_name_entry.__setitem__('state', 'disabled')
-			self.sell_mull_number_entry.__setitem__('state', 'disabled')
-			self.sell_mull_money_entry.__setitem__('state', 'disabled')
-			self.sell_mull_AddButtonOne.__setitem__('state', 'disabled')
-			self.sell_mull_AddButtonTwo.__setitem__('state', 'disabled')
-			self.sell_mull_name_listbox.__setitem__('state', 'disabled')
-			self.sell_mull_result_listbox.__setitem__('state', 'disabled')
-			self.sell_mull_YesButton.__setitem__('state', 'disabled')
-			self.sell_mull_CancelButton.__setitem__('state', 'disabled')
+			for item in self.single_sell_item_list:
+				item.__setitem__('state', 'normal')
+			for item in self.mull_sell_item_list:
+				item.__setitem__('state', 'disabled')
 		else:
 			self.sell_flag = True
-			self.sell_name_entry.__setitem__('state', 'disabled')
-			self.sell_number_entry.__setitem__('state', 'disabled')
-			self.sell_monery_entry.__setitem__('state', 'disabled')
-			self.sell_name_listbox.__setitem__('state', 'disabled')
-			self.sell_YesButton.__setitem__('state', 'disabled')
-			self.sell_CancelButton.__setitem__('state', 'disabled')
-
-			self.sell_mull_name_entry.__setitem__('state', 'normal')
-			self.sell_mull_number_entry.__setitem__('state', 'normal')
-			self.sell_mull_money_entry.__setitem__('state', 'normal')
-			self.sell_mull_AddButtonOne.__setitem__('state', 'normal')
-			self.sell_mull_AddButtonTwo.__setitem__('state', 'normal')
-			self.sell_mull_name_listbox.__setitem__('state', 'normal')
-			self.sell_mull_result_listbox.__setitem__('state', 'normal')
-			self.sell_mull_YesButton.__setitem__('state', 'normal')
-			self.sell_mull_CancelButton.__setitem__('state', 'normal')
+			for item in self.single_sell_item_list:
+				item.__setitem__('state', 'disabled')
+			for item in self.mull_sell_item_list:
+				item.__setitem__('state', 'normal')
 
 	def SellMullResultListboxDoubleClickFunc(self, event):
 		select = self.sell_mull_result_listbox.curselection()
@@ -137,7 +113,7 @@ class windos_sell_goods():
 			if not name or not number_str:
 				self.msgbox.show(self.toplevel, 240, 80, '请输入有效数据')
 				return
-            # 判断name是不是字母，如果是字母则直接提取list里的第一条信息作为name值
+			# 判断name是不是字母，如果是字母则直接提取list里的第一条信息作为name值
 			for val in name:
 				if val >= 'a' and val <= 'z':
 					name = self.sell_mull_name_listbox.get(0)
@@ -145,24 +121,11 @@ class windos_sell_goods():
 					name = self.sell_mull_name_listbox.get(0)
 				else:
 					break
-            # 将数据加入到右侧list中显示
+			# 将数据加入到右侧list中显示
 			val = '%sx%s' % (name, number_str)
 			self.sell_mull_result_listbox.insert('end', val)
-		elif args == 2:  # 添加总金额信息
-			money_str = self.sell_mull_money_entry.get()
-			if not money_str:
-				self.msgbox.show(self.toplevel, 240, 80, '请输入有效数据')
-				return
-
-			for val in self.sell_mull_result_listbox.get(0, last='end'):
-				if val.startswith('total'):
-					self.msgbox.show(self.toplevel, 240, 80, '已存在总金额信息')
-					return
-
-			val = 'total:%s' % money_str
-			self.sell_mull_result_listbox.insert('end', val)
 		else:
-			self.msgbox.show(self.toplevel, 240, 80, '已存在总金额信息')
+			self.msgbox.show(self.toplevel, 240, 80, '参数错误')
 
 	def show(self, width_percent, height_percent):
 		try:
@@ -171,6 +134,9 @@ class windos_sell_goods():
 				return
 			global_variable.child_exists = True
 
+			self.single_sell_item_list = []
+			self.mull_sell_item_list = []
+			
 			self.root.update()
 			xoffset = self.root.winfo_x()
 			yoffset = self.root.winfo_y()
@@ -178,8 +144,12 @@ class windos_sell_goods():
 			main_height = int(global_variable.main_window['size']['h'])
 			child_width = int(main_width * width_percent)
 			child_height = int(main_height * height_percent)
-			if child_height < 160: 
-				child_height = 160
+			if child_height < 180: 
+				child_height = 180
+			if child_width > 720:
+				child_width = 720
+			if child_height > 350: 
+				child_height = 350	
 			x = int(((main_width - child_width) / 2) + xoffset)
 			y = int(((main_height - child_height) / 2) + yoffset)
 			size = '{}x{}+{}+{}'.format(child_width, child_height, x, y)
@@ -197,20 +167,25 @@ class windos_sell_goods():
 			self.sell_radiobutton_var = tk.StringVar()
 			self.sell_radiobutton_var.set(1)  # 设置默认值为value=1的选项，即‘单条记录’
 			tk.Radiobutton(self.toplevel, text='单条记录', variable=self.sell_radiobutton_var, value=1,
-						   command=self.sellRadiobuttonFunc).grid(row=0, column=0, padx=10, pady=1, columnspan=3)
+						   command=self.sellRadiobuttonFunc).grid(row=0, column=0, padx=1, pady=1, columnspan=3)
 			tk.Radiobutton(self.toplevel, text='组合记录', variable=self.sell_radiobutton_var, value=2,
-						   command=self.sellRadiobuttonFunc).grid(row=0, column=4, padx=10, pady=1, columnspan=6)
+						   command=self.sellRadiobuttonFunc).grid(row=0, column=4, padx=1, pady=1, columnspan=6)
 			# 画布 绘制中间的分割线
-			canvas_width = 20
-			canvas_height = int(global_variable.main_window['size']['h'])
+			canvas_width = 10
+			canvas_height = int(child_width * 0.5)
 			canvas = tk.Canvas(self.toplevel, width=canvas_width, height=canvas_height)
 			# canvas.place(x=10,y=10, width=100, height=200)
-			canvas.grid(row=0, column=3, padx=1, pady=1, rowspan=10)
+			canvas.grid(row=0, column=3, padx=2, pady=2, rowspan=10)
 			canvas.create_line(canvas_width / 2, 0, canvas_width / 2, canvas_height)
+			
 			# label
-			tk.Label(self.toplevel, text='货物名称').grid(row=1, column=0, padx=1, pady=1)
-			tk.Label(self.toplevel, text='货物数量').grid(row=1, column=1, padx=1, pady=1)
-			tk.Label(self.toplevel, text='金 额').grid(row=1, column=2, padx=1, pady=1)
+			#左侧单条记录显示框
+			tk.Label(self.toplevel, text='货物名称', font=("黑体", 12)).grid(row=1, column=0, padx=1, pady=1)
+			tk.Label(self.toplevel, text='货物数量', font=("黑体", 12)).grid(row=1, column=1, padx=1, pady=1)
+			tk.Label(self.toplevel, text='金 额', font=("黑体", 12)).grid(row=1, column=2, padx=1, pady=1)
+			#右侧多条记录显示框
+			tk.Label(self.toplevel, text='货物名称', font=("黑体", 12)).grid(row=1, column=4, padx=1, pady=1)
+			tk.Label(self.toplevel, text='货物数量', font=("黑体", 12)).grid(row=1, column=5, padx=1, pady=1)
 			# 输入框限制函数
 			check_input_is_number_handler = self.toplevel.register(self.check_input.check_input_is_number)
 			get_name_by_pinyin = self.toplevel.register(self.get_name_by_pinyin_func)
@@ -219,90 +194,105 @@ class windos_sell_goods():
 			self.sell_name_entry = tk.Entry(self.toplevel, textvariable=self.sell_name_entry_var, validate='key',
 											validatecommand=(get_name_by_pinyin, '%P'))
 			self.sell_name_entry.grid(row=2, column=0, padx=1, pady=1)
+			self.single_sell_item_list.append(self.sell_name_entry)
 			
 			# 显示选项的listbox
 			var1 = tk.StringVar()
 			self.sell_name_listbox = tk.Listbox(self.toplevel, listvariable=var1, selectmode="browse")
-			self.sell_name_listbox.grid(row=3, column=0, padx=1, pady=1)
+			self.sell_name_listbox.grid(row=3, column=0, padx=1, pady=1, rowspan=8)
 			self.sell_name_listbox.bind("<<ListboxSelect>>", self.FuncSellComboxSelectedHander)
+			self.single_sell_item_list.append(self.sell_name_listbox)
+			
 			# 货物数量输入框
 			var2 = tk.StringVar()
 			self.sell_number_entry = tk.Entry(self.toplevel, textvariable=var2, width=8, validate='key',
 											  validatecommand=(check_input_is_number_handler, '%P'))  # %P代表输入框的实时内容)
 			self.sell_number_entry.grid(row=2, column=1, padx=1, pady=1)
+			self.single_sell_item_list.append(self.sell_number_entry)
+			
 			# 货物钱数输入框（单价or总价）
 			var3 = tk.StringVar()
 			self.sell_monery_entry = tk.Entry(self.toplevel, textvariable=var3, width=8, validate='key',
 											  validatecommand=(check_input_is_number_handler, '%P'))
 			self.sell_monery_entry.grid(row=2, column=2, padx=1, pady=1)
+			self.single_sell_item_list.append(self.sell_monery_entry)
+			
 			# 按钮
-			self.sell_YesButton = tk.Button(self.toplevel, text='确认', command=lambda: self.__button_confirm_callback(self.toplevel, 1))
-			self.sell_YesButton.grid(row=3, column=1, padx=1, pady=1)
-			self.sell_CancelButton = tk.Button(self.toplevel, text='取消', command=lambda: self.__button_cancel_callback(self.toplevel))
-			self.sell_CancelButton.grid(row=3, column=2, padx=1, pady=1)
+			self.sell_YesButton = tk.Button(self.toplevel, text='确认', bd=4, font=("黑体", 12), command=lambda: self.__button_confirm_callback(self.toplevel, 1))
+			self.sell_YesButton.grid(row=3, column=1, padx=1, pady=1, columnspan=2, rowspan=2)
+			self.sell_CancelButton = tk.Button(self.toplevel, text='取消', bd=4, font=("黑体", 12), command=lambda: self.__button_cancel_callback(self.toplevel))
+			self.sell_CancelButton.grid(row=6, column=1, padx=1, pady=1, columnspan=2, rowspan=2)
+			self.single_sell_item_list.append(self.sell_YesButton)
+			self.single_sell_item_list.append(self.sell_CancelButton)
+
 
 			# 右侧多条记录的界面
 			# label
-			tk.Label(self.toplevel, text='货物名称').place(x=300, y=30, width=100, height=22)
+			#tk.Label(self.toplevel, text='货物名称').place(x=300, y=30, width=100, height=22)
 			self.sell_mull_name_entry_var = tk.StringVar()
 			self.sell_mull_name_entry = tk.Entry(self.toplevel, textvariable=self.sell_mull_name_entry_var, validate='key',
 												 validatecommand=(get_name_by_pinyin, '%P'))
-			self.sell_mull_name_entry.place(x=298, y=55, width=120, height=22)
-
-			tk.Label(self.toplevel, text='货物数量').place(x=410, y=30, width=100, height=22)
+			#self.sell_mull_name_entry.place(x=298, y=55, width=120, height=22)
+			self.sell_mull_name_entry.grid(row=2, column=4, padx=1, pady=1)
+			self.mull_sell_item_list.append(self.sell_mull_name_entry)
+			
+			#tk.Label(self.toplevel, text='货物数量').place(x=410, y=30, width=100, height=22)
 			var_mull0 = tk.StringVar()
 			self.sell_mull_number_entry = tk.Entry(self.toplevel, textvariable=var_mull0, validate='key',
 												   validatecommand=(check_input_is_number_handler, '%P'))
-			self.sell_mull_number_entry.place(x=430, y=55, width=50, height=22)
-
-			tk.Label(self.toplevel, text='双击来删除对应条目', fg='red').place(x=570, y=30, width=160, height=22)
-
-			tk.Label(self.toplevel, text='总金额').place(x=400, y=85, width=100, height=22)
+			#self.sell_mull_number_entry.place(x=430, y=55, width=50, height=22)
+			self.sell_mull_number_entry.grid(row=2, column=5, padx=1, pady=1)
+			self.mull_sell_item_list.append(self.sell_mull_number_entry)
+			
+			#tk.Label(self.toplevel, text='双击来删除对应条目', fg='red').place(x=570, y=30, width=160, height=22)
+			tk.Label(self.toplevel, text='双击来删除对应条目', fg='red').grid(row=8, column=6, padx=1, pady=1)
+			#总金额输入框
+			tk.Label(self.toplevel, text='总 金 额', font=("黑体", 12)).grid(row=3, column=6, padx=1, pady=1)
 			var_mull3 = tk.StringVar()
-			self.sell_mull_money_entry = tk.Entry(self.toplevel, textvariable=var_mull3, validate='key',
+			self.sell_mull_money_entry = tk.Entry(self.toplevel, textvariable=var_mull3, validate='key', width=8,
 												  validatecommand=(check_input_is_number_handler, '%P'))
-			self.sell_mull_money_entry.place(x=430, y=110, width=50, height=22)
+			#self.sell_mull_money_entry.place(x=430, y=110, width=50, height=22)
+			self.sell_mull_money_entry.grid(row=4, column=6, padx=1, pady=1)
+			self.mull_sell_item_list.append(self.sell_mull_money_entry)
 
 			# 添加功能按钮
 			# 这个添加按钮是放在货物信息右面
 			self.sell_mull_AddButtonOne = tk.Button(self.toplevel, text='添加',
-													command=lambda arg=1: self.FuncButtonSellMullAdd(arg, 1))
-			self.sell_mull_AddButtonOne.place(x=500, y=55, width=50, height=22)
-			# 这个按钮是放在总金额的右面
-			self.sell_mull_AddButtonTwo = tk.Button(self.toplevel, text='添加',
-													command=lambda arg=2: self.FuncButtonSellMullAdd(arg, 2))
-			self.sell_mull_AddButtonTwo.place(x=500, y=110, width=50, height=22)
-
+													command=lambda arg=1: self.FuncButtonSellMullAdd(arg))
+			#self.sell_mull_AddButtonOne.place(x=500, y=55, width=50, height=22)
+			self.sell_mull_AddButtonOne.grid(row=2, column=6, padx=1, pady=1)
+			self.mull_sell_item_list.append(self.sell_mull_AddButtonOne)
+			
 			# 显示根据拼音显示出来的选项的listbox
 			var_mull1 = tk.StringVar()
 			self.sell_mull_name_listbox = tk.Listbox(self.toplevel, listvariable=var_mull1, selectmode="browse")
-			# self.sell_mull_name_listbox.grid(row=3, column=4, padx=1, pady=1)
-			self.sell_mull_name_listbox.place(x=298, y=85, width=120, height=180)
+			self.sell_mull_name_listbox.grid(row=3, column=4, padx=1, pady=1, rowspan=8)
+			#self.sell_mull_name_listbox.place(x=298, y=85, width=120, height=180)
 			self.sell_mull_name_listbox.bind("<<ListboxSelect>>", self.FuncSellComboxSelectedHander)
+			self.mull_sell_item_list.append(self.sell_mull_name_listbox)
+			
 			# 显示添加结果的列表的listbox
 			var_mull2 = tk.StringVar()
 			self.sell_mull_result_listbox = tk.Listbox(self.toplevel, listvariable=var_mull2, selectmode="browse")
-			self.sell_mull_result_listbox.place(x=580, y=55, width=140, height=200)
+			#self.sell_mull_result_listbox.place(x=580, y=55, width=140, height=200)
+			self.sell_mull_result_listbox.grid(row=3, column=5, padx=1, pady=1, rowspan=7)
 			self.sell_mull_result_listbox.bind("<Double-Button-1>", self.SellMullResultListboxDoubleClickFunc)
-
+			self.mull_sell_item_list.append(self.sell_mull_result_listbox)
+			
 			# 确认按钮
 			self.sell_mull_YesButton = tk.Button(self.toplevel, text='确认',
 												 command=lambda: self.__button_confirm_callback(self.toplevel, 2))
-			self.sell_mull_YesButton.place(x=430, y=200, width=50, height=22)
+			self.sell_mull_YesButton.grid(row=5, column=6, padx=1, pady=1)
 			# 取消按钮
 			self.sell_mull_CancelButton = tk.Button(self.toplevel, text='取消',
 													command=lambda: self.__button_cancel_callback(self.toplevel))
-			self.sell_mull_CancelButton.place(x=490, y=200, width=50, height=22)
+			self.sell_mull_CancelButton.grid(row=6, column=6, padx=1, pady=1)
+			self.mull_sell_item_list.append(self.sell_mull_YesButton)
+			self.mull_sell_item_list.append(self.sell_mull_CancelButton)
+			
 			# 设置右侧按钮位disable状态
-			self.sell_mull_name_entry.__setitem__('state', 'disabled')
-			self.sell_mull_number_entry.__setitem__('state', 'disabled')
-			self.sell_mull_money_entry.__setitem__('state', 'disabled')
-			self.sell_mull_AddButtonOne.__setitem__('state', 'disabled')
-			self.sell_mull_AddButtonTwo.__setitem__('state', 'disabled')
-			self.sell_mull_name_listbox.__setitem__('state', 'disabled')
-			self.sell_mull_result_listbox.__setitem__('state', 'disabled')
-			self.sell_mull_YesButton.__setitem__('state', 'disabled')
-			self.sell_mull_CancelButton.__setitem__('state', 'disabled')
+			for item in self.mull_sell_item_list:
+				item.__setitem__('state', 'disabled')
 		except Exception as e:
 			self.logger.error("windos_sell_goods show error:{}".format(e))
 
